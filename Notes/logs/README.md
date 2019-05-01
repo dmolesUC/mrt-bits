@@ -4,7 +4,15 @@
 
 1.5 million lines of Apache access logs from uc3-mrtstore1-prd, covering 15
 July 2018 – 28 Apr 2019. Use `gzcat` or `gunzip -c` to read without
-uncompressing. (Uncompressed size: 330 MB) |
+uncompressing. (Uncompressed size: 330 MB) 
+
+## `requests.gz`
+
+The extract request from each line, except for the following invalid request from `ingest02`:
+
+```
+"-" - - [25/Feb/2019:10:34:33 -0800] "\xff\xf4\xff\xfd\x06" 400 319 "-" "-" 0 7 0 "172.30.8.76"
+```
 
 ## Requests
 
