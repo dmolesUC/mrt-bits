@@ -48,7 +48,7 @@ POST requests are in one of the following forms:
 | Count  | Form                                             | Purpose                               |
 | ---    | ---                                              | ---                                   |
 | 69,451 | `POST /add/<node>/<encoded-ark>`                 |                                       |
-| 7,210  | `POST /update/<node><encoded-ark>`               |                                       |
+| 7,210  | `POST /update/<node>/<encoded-ark>`               |                                       |
 | 88     | `POST /producerasync/<node>/<encoded-ark>`       | async object download (user-friendly) |
 | 1      | `POST /copy/<from-node>/<to-node>/<encoded-ark>` | *                                     |
 | 0      | `POST /async/<node>/<encoded-ark>`               | async object download†                |
