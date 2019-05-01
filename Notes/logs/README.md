@@ -17,21 +17,21 @@ GET requests are in one of the following forms:
 | Count   | Form                                                                       | Purpose                          |
 | ---     | ---                                                                        | ---                              |
 | 928,812 | `GET /content/<node>/<encoded-ark>/<version>/<encoded-pathname>`           | file download                    |
-| 389,130 | `GET /content/<node>/<encoded-ark>/<version>/<encoded-pathname>?fixity=no` | file download                    |
-|  79,107 | `GET /manifest/<node>/<encoded-ark>`                                       | manifest request                 |
-|    1236 | `GET /producer/<node>/<encoded-ark>/<version>?t=zip`                       | version download (user-friendly) |
-|    1226 | `GET /content/<node>/<encoded-ark>?t=zip`                                  | object download                  |
-|     549 | `GET /ping?t=xml&SLEEP=<time>`                                             | ping                             |
-|     326 | `GET /?t=xml&SLEEP=`                                                       | ping (?)                         |
-|     174 | `GET /content/<node>/<encoded-ark>/<version>?t=zip`                        | version download                 |
-|      11 | `GET /state?t=xml`                                                         | state                            |
-|       3 | `GET /state/<node>/<encoded-ark>`                                          | state (object)                   |
-|       2 | `GET /state/<node>?t=anvl`                                                 | state (node)                     |
-|       1 | `GET /state/<node>/<encoded-ark>/<version>?t=xml`                          | state (version)                  |
-|       1 | `GET /producer/<node>/<encoded-ark>?t=zip`                                 | object download (user-friendly)  |
-|       1 | `GET /cloudcontainer/`                                                     | *                 |
+| 389,130 | `GET /content/<node>/<encoded-ark>/<version>/<encoded-pathname>?fixity=no` | file download for audit          |
+| 79,107  | `GET /manifest/<node>/<encoded-ark>`                                       | manifest request                 |
+| 1236    | `GET /producer/<node>/<encoded-ark>/<version>?t=zip`                       | version download (user-friendly) |
+| 1226    | `GET /content/<node>/<encoded-ark>?t=zip`                                  | object download                  |
+| 549     | `GET /ping?t=xml&SLEEP=<time>`                                             | ping                             |
+| 326     | `GET /?t=xml&SLEEP=`                                                       | *                                |
+| 174     | `GET /content/<node>/<encoded-ark>/<version>?t=zip`                        | version download                 |
+| 11      | `GET /state?t=xml`                                                         | state                            |
+| 3       | `GET /state/<node>/<encoded-ark>`                                          | state (object)                   |
+| 2       | `GET /state/<node>?t=anvl`                                                 | state (node)                     |
+| 1       | `GET /state/<node>/<encoded-ark>/<version>?t=xml`                          | state (version)                  |
+| 1       | `GET /producer/<node>/<encoded-ark>?t=zip`                                 | object download (user-friendly)  |
+| 1       | `GET /cloudcontainer/`                                                     | *                                |
 
-<sup>* Response code 404 Not Found</sup>
+<sup>* Response code always 404 Not Found</sup>
 
 ### POST requests
 
@@ -40,12 +40,13 @@ POST requests are in one of the following forms:
 | Count  | Form                                             | Purpose                               |
 | ---    | ---                                              | ---                                   |
 | 69,451 | `POST /add/<node>/<encoded-ark>`                 |                                       |
-|  7,210 | `POST /update/<node><encoded-ark>`               |                                       |
-|     88 | `POST /producerasync/<node>/<encoded-ark>`       | async object download (user-friendly) |
-|      1 | `POST /copy/<from-node>/<to-node>/<encoded-ark>` | *                                      |
-|      0 | `POST /async/<node>/<encoded-ark>`               | async object download†                |
+| 7,210  | `POST /update/<node><encoded-ark>`               |                                       |
+| 88     | `POST /producerasync/<node>/<encoded-ark>`       | async object download (user-friendly) |
+| 1      | `POST /copy/<from-node>/<to-node>/<encoded-ark>` | *                                     |
+| 0      | `POST /async/<node>/<encoded-ark>`               | async object download†                |
 
 <sup>* Response code 404 Not Found</sup>
+
 <sup>† Not present in dataset, but hypothetically possible</sup>
 
 ### DELETE requests
