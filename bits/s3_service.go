@@ -12,9 +12,17 @@ import (
 // ------------------------------------------------------------
 // Service implementation
 
-func NewS3Service(endpoint string) Service {
-	region := regionFromEndpoint(endpoint)
+func NewS3Service(region string, endpoint string) Service {
 	return &s3Service{region: region, endpoint: endpoint}
+}
+
+func NewS3ServiceForRegion(region string) Service {
+	return NewS3Service(region, defaultAwsEndpoint)
+}
+
+func NewS3ServiceForEndpoint(endpoint string) Service {
+	region := regionFromEndpoint(endpoint)
+	return NewS3Service(region, endpoint)
 }
 
 func (s *s3Service) Type() ServiceType {
@@ -51,11 +59,11 @@ func (s *s3Service) ContentLength(container string, key string) (int64, error) {
 // Unexported implementation
 
 type s3Service struct {
-	region string
+	region   string
 	endpoint string
 
-	awsSession *session.Session
-	s3Svc      *s3.S3
+	awsSession   *session.Session
+	s3Svc        *s3.S3
 	s3Downloader *s3manager.Downloader
 }
 
@@ -96,8 +104,8 @@ func (s *s3Service) s3() (*s3.S3, error) {
 // Helper functions
 
 const (
-	// defaultAwsRegion represents the default AWS region for accessing AWS objects
-	defaultAwsRegion     = "us-west-2"
+	defaultAwsEndpoint = ""
+	defaultAwsRegion   = "us-west-2"
 	awsRegionRegexpStr = "https?://s3-([^.]+)\\.amazonaws\\.com"
 )
 
