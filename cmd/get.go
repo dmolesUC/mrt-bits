@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"io"
 	"os"
+	"path"
 )
 
 const (
@@ -16,11 +17,19 @@ const (
 	flagBucket  = "bucket"
 	usageBucket = "bucket or container (required)"
 
+	flagOutput = "output"
+	usageOutput = "write to specified file instead of stdout"
+
+	flagRemoteName = "remote-name"
+	usageRemoteName = "write output to file named based on the remote key"
+
 	bufsize = 512 * 1024
 )
 
 func init() {
 	bucket := ""
+	output := ""
+	remoteName := false
 
 	cmd := &cobra.Command{
 		Use:   usageGet,
@@ -28,44 +37,88 @@ func init() {
 		Long:  longDescGet,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return get(bucket, args[0])
+			key := args[0]
+			if remoteName {
+				if output != "" {
+					return fmt.Errorf("\"%s\" and \"%s\" arguments cannot be specified together", flagOutput, flagRemoteName)
+				}
+				return downloadToFile(bucket, key, path.Base(key))
+			}
+			if output != "" {
+				return downloadToFile(bucket, key, output)
+			}
+			return download(bucket, key)
 		},
 	}
-	// TODO: add -o/--output and -O/--remote-name
 	cmd.Flags().StringVarP(&bucket, flagBucket, "b", "", usageBucket)
 	_ = cmd.MarkFlagRequired(flagBucket)
+
+	cmd.Flags().StringVarP(&output, flagOutput, "o", "", usageOutput)
+	cmd.Flags().BoolVarP(&remoteName, flagRemoteName, "O", false, usageRemoteName)
 
 	rootCmd.AddCommand(cmd)
 }
 
-func get(bucket, key string) error {
+func download(bucket, key string) error {
 	svc, err := flags.Service()
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(os.Stderr, "Getting %#v from service %s, bucket %#v\n", key, svc, bucket)
+	_, _ = fmt.Fprintf(os.Stderr, "Writing %#v from service %s, bucket %#v to stdout\n", key, svc, bucket)
 
-	_, body, err := svc.Get(bucket, key)
-	defer service.CloseQuietly(body)
+	downloadTo := downloader(bucket, key)
+	return downloadTo(os.Stdout, svc)
+}
+
+func downloadToFile(bucket, key, filename string) error {
+	svc, err := flags.Service()
 	if err != nil {
 		return err
 	}
-	buffer := make([]byte, bufsize)
-	for {
-		n, err := body.Read(buffer)
-		if n > 0 {
-			_, err2 := os.Stdout.Write(buffer[:n])
-			if err2 != nil {
-				return err2
-			}
-		}
-		if err == io.EOF {
-			break
-		}
+	_, _ = fmt.Fprintf(os.Stderr, "Writing %#v from service %s, bucket %#v to %s\n", key, svc, bucket, filename)
+
+
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		file, err := os.Create(filename)
+		defer service.CloseQuietly(file) // TODO: move this
 		if err != nil {
 			return err
 		}
-	}
 
-	return nil
+		downloadTo := downloader(bucket, key)
+		return downloadTo(file, svc)
+	}
+	return fmt.Errorf("file %#v already exists", filename)
+}
+
+func downloader(bucket, key string) (downloadTo func(out io.WriteCloser, svc service.Service) error) {
+	return func(out io.WriteCloser, svc service.Service) error {
+		_, body, err := svc.Get(bucket, key)
+		defer service.CloseQuietly(body)
+		if err != nil {
+			return err
+		}
+		total := 0
+		defer func() {
+			_, _ = fmt.Fprintf(os.Stderr, "%d bytes downloaded\n", total)
+		}()
+		buffer := make([]byte, bufsize)
+		for {
+			n, err := body.Read(buffer)
+			if n > 0 {
+				total += n
+				_, err2 := out.Write(buffer[:n])
+				if err2 != nil {
+					return err2
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
