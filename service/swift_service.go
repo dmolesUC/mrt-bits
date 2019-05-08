@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"github.com/ncw/swift"
 	"io"
 	"strconv"
@@ -9,7 +10,12 @@ import (
 // ------------------------------------------------------------
 // Service implementation
 
-func NewSwiftService(user, key, endpoint string) Service {
+func NewSwiftService(endpoint string) Service {
+	if endpoint == "" {
+		endpoint = envStAuth.Get()
+	}
+	user := envStUser.Get()
+	key := envStKey.Get()
 	return &swiftService{user: user, key: key, authUrl: endpoint}
 }
 
@@ -21,6 +27,7 @@ func (s *swiftService) Get(container string, key string) (int64, io.ReadCloser, 
 	cnx := s.Connection()
 	file, headers, err := cnx.ObjectOpen(container, key, false, nil)
 	if err != nil {
+		defer CloseQuietly(file)
 		return -1, nil, err
 	}
 
@@ -57,6 +64,10 @@ type swiftService struct {
 	authUrl string
 
 	connection *swift.Connection
+}
+
+func (s *swiftService) String() string {
+	return fmt.Sprintf("%v (%#v)", Swift, s.authUrl)
 }
 
 func (s *swiftService) Connection() *swift.Connection {

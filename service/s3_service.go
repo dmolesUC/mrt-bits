@@ -1,7 +1,9 @@
 package service
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -12,17 +14,27 @@ import (
 // ------------------------------------------------------------
 // Service implementation
 
-func NewS3Service(region string, endpoint string) Service {
+func NewS3Service(region, endpoint string) Service {
+	if endpoint == "" {
+		endpoint = defaultAwsEndpoint
+	}
+	if region == "" {
+		region = envAwsRegion.Get()
+	}
+	if region == "" {
+		region = regionFromEndpoint(endpoint)
+	}
+	key := envAwsAccessKeyId.Get()
+	secret := envAwsSecretAccessKey.Get()
+	sessionToken := envAwsSessionToken.Get()
+	if key != "" {
+		return &s3Service{
+			region:      region,
+			endpoint:    endpoint,
+			credentials: credentials.NewStaticCredentials(key, secret, sessionToken),
+		}
+	}
 	return &s3Service{region: region, endpoint: endpoint}
-}
-
-func NewS3ServiceForRegion(region string) Service {
-	return NewS3Service(region, defaultAwsEndpoint)
-}
-
-func NewS3ServiceForEndpoint(endpoint string) Service {
-	region := regionFromEndpoint(endpoint)
-	return NewS3Service(region, endpoint)
 }
 
 func (s *s3Service) Type() ServiceType {
@@ -37,6 +49,7 @@ func (s *s3Service) Get(container string, key string) (int64, io.ReadCloser, err
 	input := &s3.GetObjectInput{Bucket: &container, Key: &key}
 	output, err := s3svc.GetObject(input)
 	if err != nil {
+		defer CloseQuietly(output.Body)
 		return -1, nil, err
 	}
 	return *output.ContentLength, output.Body, nil
@@ -59,17 +72,22 @@ func (s *s3Service) ContentLength(container string, key string) (int64, error) {
 // Unexported implementation
 
 type s3Service struct {
-	region   string
-	endpoint string
+	region      string
+	endpoint    string
+	credentials *credentials.Credentials
 
 	awsSession   *session.Session
 	s3Svc        *s3.S3
 	s3Downloader *s3manager.Downloader
 }
 
+func (s *s3Service) String() string {
+	return fmt.Sprintf("%v (%#v, %#v)", S3, s.region, s.endpoint)
+}
+
 func (s *s3Service) session() (*session.Session, error) {
 	if s.awsSession == nil {
-		awsSession, err := validS3Session(s.endpoint, s.region)
+		awsSession, err := s.newSession()
 		if err != nil {
 			return nil, err
 		}
@@ -100,24 +118,14 @@ func (s *s3Service) s3() (*s3.S3, error) {
 	return s.s3Svc, nil
 }
 
-// ------------------------------------------------------------
-// Helper functions
-
-const (
-	defaultAwsEndpoint = ""
-	defaultAwsRegion   = "us-west-2"
-	awsRegionRegexpStr = "https?://s3-([^.]+)\\.amazonaws\\.com"
-)
-
-var awsRegionRegexp = regexp.MustCompile(awsRegionRegexpStr)
-
-func validS3Session(endpoint string, region string) (awsSession *session.Session, err error) {
+func (s *s3Service) newSession() (awsSession *session.Session, err error) {
 	forcePathStyle := true
 	credentialsChainVerboseErrors := false
 	s3Config := aws.Config{
-		Endpoint:                      &endpoint,
-		Region:                        &region,
+		Endpoint:                      &s.endpoint,
+		Region:                        &s.region,
 		S3ForcePathStyle:              &forcePathStyle,
+		Credentials:                   s.credentials,
 		CredentialsChainVerboseErrors: &credentialsChainVerboseErrors,
 	}
 	s3Opts := session.Options{
@@ -126,6 +134,17 @@ func validS3Session(endpoint string, region string) (awsSession *session.Session
 	}
 	return session.NewSessionWithOptions(s3Opts)
 }
+
+// ------------------------------------------------------------
+// Helper functions
+
+const (
+	defaultAwsEndpoint = "" // SDK will figure it out from region
+	defaultAwsRegion   = "us-west-2"
+	awsRegionRegexpStr = "https?://s3-([^.]+)\\.amazonaws\\.com"
+)
+
+var awsRegionRegexp = regexp.MustCompile(awsRegionRegexpStr)
 
 func regionFromEndpoint(endpoint string) string {
 	matches := awsRegionRegexp.FindStringSubmatch(endpoint)
