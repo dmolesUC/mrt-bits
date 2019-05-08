@@ -1,4 +1,4 @@
-package bits
+package service
 
 type Bitstream interface {
 	Container() string

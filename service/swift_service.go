@@ -1,4 +1,4 @@
-package bits
+package service
 
 import (
 	"github.com/ncw/swift"
