@@ -38,6 +38,7 @@ func init() {
 		Long:  longDescGet,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: move this and the methods it calls out of the cmd package
 			key := args[0]
 			if remoteName {
 				if output != "" {
