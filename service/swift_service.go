@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"github.com/dmolesUC3/mrt-bits/internal/quietly"
 	"github.com/ncw/swift"
 	"io"
 	"strconv"
@@ -27,7 +28,7 @@ func (s *swiftService) Get(container string, key string) (int64, io.ReadCloser, 
 	cnx := s.Connection()
 	file, headers, err := cnx.ObjectOpen(container, key, false, nil)
 	if err != nil {
-		defer CloseQuietly(file)
+		defer quietly.Close(file)
 		return -1, nil, err
 	}
 

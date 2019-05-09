@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/dmolesUC3/mrt-bits/internal/quietly"
 	"github.com/dmolesUC3/mrt-bits/service"
 	"github.com/spf13/cobra"
 	"io"
@@ -80,7 +81,7 @@ func downloadToFile(bucket, key, filename string) error {
 
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		file, err := os.Create(filename)
-		defer service.CloseQuietly(file) // TODO: move this
+		defer quietly.Close(file)
 		if err != nil {
 			return err
 		}
@@ -94,7 +95,7 @@ func downloadToFile(bucket, key, filename string) error {
 func downloader(bucket, key string) (downloadTo func(out io.WriteCloser, svc service.Service) error) {
 	return func(out io.WriteCloser, svc service.Service) error {
 		_, body, err := svc.Get(bucket, key)
-		defer service.CloseQuietly(body)
+		defer quietly.Close(body)
 		if err != nil {
 			return err
 		}

@@ -12,10 +12,3 @@ type Service interface {
 	ContentLength(container string, key string) (int64, error)
 }
 
-func CloseQuietly(body io.Closer) func() {
-	return func() {
-		if body != nil {
-			_ = body.Close()
-		}
-	}
-}

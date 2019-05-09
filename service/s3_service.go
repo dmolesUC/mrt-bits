@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/dmolesUC3/mrt-bits/internal/quietly"
 	"io"
 	"regexp"
 )
@@ -49,7 +50,7 @@ func (s *s3Service) Get(container string, key string) (int64, io.ReadCloser, err
 	input := &s3.GetObjectInput{Bucket: &container, Key: &key}
 	output, err := s3svc.GetObject(input)
 	if err != nil {
-		defer CloseQuietly(output.Body)
+		defer quietly.Close(output.Body)
 		return -1, nil, err
 	}
 	return *output.ContentLength, output.Body, nil
