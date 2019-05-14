@@ -52,7 +52,7 @@ func (s *swiftService) Each(container string, prefix string, do func(string) err
 	cnx := s.Connection()
 	objects, err := cnx.Objects(container, opts)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 	for i, obj := range objects {
 		err = do(obj.Name)

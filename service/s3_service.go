@@ -70,7 +70,36 @@ func (s *s3Service) ContentLength(container string, key string) (int64, error) {
 }
 
 func (s *s3Service) Each(container string, prefix string, do func(string) error) (int, error) {
-	panic("implement me")
+	s3svc, err := s.s3()
+	if err != nil {
+		return -1, err
+	}
+	var prefixP *string
+	if prefix != "" {
+		prefixP = &prefix
+	}
+	count := 0
+	input := &s3.ListObjectsV2Input{Bucket: &container, Prefix: prefixP}
+	var errInner error
+	errOuter := s3svc.ListObjectsV2Pages(input, func(output *s3.ListObjectsV2Output, b bool) bool {
+		for _, o := range output.Contents {
+			keyP := o.Key
+			var key string
+			if keyP != nil {
+				key = *keyP
+			}
+			errInner = do(key)
+			if errInner != nil {
+				return false
+			}
+			count += 1
+		}
+		return true
+	})
+	if errInner != nil {
+		return count, errInner
+	}
+	return count, errOuter
 }
 
 // ------------------------------------------------------------
