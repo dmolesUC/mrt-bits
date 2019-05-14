@@ -43,6 +43,26 @@ func (s *swiftService) Get(container string, key string) (int64, io.ReadCloser, 
 	return length, file, nil
 }
 
+func (s *swiftService) Each(container string, prefix string, do func(string) error) (int, error) {
+	var opts *swift.ObjectsOpts
+	if prefix != "" {
+		opts = &swift.ObjectsOpts{Prefix: prefix}
+	}
+
+	cnx := s.Connection()
+	objects, err := cnx.Objects(container, opts)
+	if err != nil {
+		return 0, err
+	}
+	for i, obj := range objects {
+		err = do(obj.Name)
+		if err != nil {
+			return i, err
+		}
+	}
+	return len(objects), nil
+}
+
 func (s *swiftService) ContentLength(container string, key string) (int64, error) {
 	cnx := s.Connection()
 	info, _, err := cnx.Object(container, key)

@@ -1,4 +1,4 @@
-package download
+package operations
 
 import (
 	"fmt"
@@ -9,27 +9,23 @@ import (
 	"path"
 )
 
-const (
-	bufsize = 512 * 1024
-)
-
 type Download interface {
-	To(out io.WriteCloser) (int, error)
+	To(out io.Writer) (int, error)
 	ToFile(filename string) (int, error)
 	ToRemoteFile() (int, error)
 }
 
-func NewDownload(svc service.Service, bucket, key string) Download {
-	return &download{svc: svc, bucket: bucket, key: key}
+func NewDownload(svc service.Service, container, key string) Download {
+	return &download{svc: svc, container: container, key: key}
 }
 
 // ------------------------------------------------
 // Unexported symbols
 
 type download struct {
-	svc    service.Service
-	bucket string
-	key    string
+	svc       service.Service
+	container string
+	key       string
 }
 
 func (d *download) ToFile(filename string) (int, error) {
@@ -50,9 +46,8 @@ func (d *download) ToRemoteFile() (int, error) {
 	return d.ToFile(path.Base(d.key))
 }
 
-func (d *download) To(out io.WriteCloser) (int, error) {
-	svc, bucket, key := d.svc, d.bucket, d.key
-	_, body, err := svc.Get(bucket, key)
+func (d *download) To(out io.Writer) (int, error) {
+	_, body, err := d.svc.Get(d.container, d.key)
 	defer quietly.Close(body)
 	if err != nil {
 		return 0, err

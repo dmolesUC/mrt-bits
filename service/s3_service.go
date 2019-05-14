@@ -69,6 +69,10 @@ func (s *s3Service) ContentLength(container string, key string) (int64, error) {
 	return *output.ContentLength, nil
 }
 
+func (s *s3Service) Each(container string, prefix string, do func(string) error) (int, error) {
+	panic("implement me")
+}
+
 // ------------------------------------------------------------
 // Unexported implementation
 
