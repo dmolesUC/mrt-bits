@@ -33,6 +33,8 @@ type download struct {
 }
 
 func (d *download) ToFile(filename string) (int, error) {
+	// TODO: don't create file till we know we've got something
+	//       (and/or quietly delete file)
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		file, err := os.Create(filename)
 		defer quietly.Close(file)
