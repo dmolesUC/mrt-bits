@@ -11,7 +11,7 @@ import (
 )
 
 type Archive interface {
-	Size() (int64, error)
+	Size() (size int64, count int, err error)
 	To(out io.Writer) (int, error)
 }
 
@@ -38,8 +38,8 @@ type zipArchive struct {
 	prefix    string
 }
 
-func (a *zipArchive) Size() (int64, error) {
-	var count int64
+func (a *zipArchive) Size() (int64, int, error) {
+	var count int
 	var size int64
 	var cdSize int64
 	_, err := a.service.EachMetadata(a.container, a.prefix, func(key string, contentLength int64) error {
@@ -80,7 +80,7 @@ func (a *zipArchive) Size() (int64, error) {
 
 	size += cdSize
 
-	return size, err
+	return size, count, err
 }
 
 func (a *zipArchive) To(out io.Writer) (int, error) {
@@ -88,6 +88,7 @@ func (a *zipArchive) To(out io.Writer) (int, error) {
 	count, err := a.service.EachObject(a.container, a.prefix, func(key string, contentLength int64, body io.ReadCloser, err error) error {
 		defer quietly.Close(body)
 		entryName := key
+		// TODO: more metadata -- at least modification time
 		header := &zip.FileHeader{Name: entryName, Method: zip.Store}
 		entryWriter, err := w.CreateHeader(header)
 		if err != nil {
