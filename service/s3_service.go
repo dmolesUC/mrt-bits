@@ -7,7 +7,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/dmolesUC3/mrt-bits/internal/pointers"
 	"github.com/dmolesUC3/mrt-bits/internal/quietly"
+	"github.com/dmolesUC3/mrt-bits/internal/streams"
 	"io"
 	"regexp"
 )
@@ -70,36 +72,30 @@ func (s *s3Service) ContentLength(container string, key string) (int64, error) {
 }
 
 func (s *s3Service) Each(container string, prefix string, do func(string) error) (int, error) {
-	s3svc, err := s.s3()
+	objects, err := s.objectsIn(container, prefix)
 	if err != nil {
 		return -1, err
 	}
-	var prefixP *string
-	if prefix != "" {
-		prefixP = &prefix
-	}
-	count := 0
-	input := &s3.ListObjectsV2Input{Bucket: &container, Prefix: prefixP}
-	var errInner error
-	errOuter := s3svc.ListObjectsV2Pages(input, func(output *s3.ListObjectsV2Output, b bool) bool {
-		for _, o := range output.Contents {
-			keyP := o.Key
-			var key string
-			if keyP != nil {
-				key = *keyP
-			}
-			errInner = do(key)
-			if errInner != nil {
-				return false
-			}
-			count += 1
-		}
-		return true
+	return objects.forEach(func(o *s3.Object) error {
+		key := pointers.ToString(o.Key)
+		return do(key)
 	})
-	if errInner != nil {
-		return count, errInner
+}
+
+func (s *s3Service) GetEach(container string, prefix string, do func(int64, io.ReadCloser, error) error) (int, error) {
+	objects, err := s.objectsIn(container, prefix)
+	if err != nil {
+		return -1, err
 	}
-	return count, errOuter
+	return objects.forEach(func(o *s3.Object) error {
+		size := pointers.ToInt64(o.Size)
+		if size == 0 {
+			return do(size, streams.EmptyReader(), nil)
+		}
+		key := pointers.ToString(o.Key)
+		size, body, err := s.Get(container, key)
+		return do(size, body, err)
+	})
 }
 
 // ------------------------------------------------------------
@@ -169,6 +165,14 @@ func (s *s3Service) newSession() (awsSession *session.Session, err error) {
 	return session.NewSessionWithOptions(s3Opts)
 }
 
+func (s *s3Service) objectsIn(container, prefix string) (*s3ObjectIterator, error) {
+	s3svc, err := s.s3()
+	if err != nil {
+		return nil, err
+	}
+	return &s3ObjectIterator{s3svc: s3svc, container: container, prefix: prefix}, nil
+}
+
 // ------------------------------------------------------------
 // Helper functions
 
@@ -188,3 +192,36 @@ func regionFromEndpoint(endpoint string) string {
 	}
 	return defaultAwsRegion
 }
+
+// ------------------------------------------------------------
+// Helper types
+
+type s3ObjectIterator struct {
+	s3svc     *s3.S3
+	container string
+	prefix    string
+}
+
+func (it *s3ObjectIterator) forEach(do func(o *s3.Object) error) (int, error) {
+	var errInner error
+	var count int
+
+	pageHandler := func(output *s3.ListObjectsV2Output, b bool) bool {
+		for _, o := range output.Contents {
+			errInner = do(o)
+			if errInner != nil {
+				return false
+			}
+			count += 1
+		}
+		return true
+	}
+
+	input := &s3.ListObjectsV2Input{Bucket: &it.container, Prefix: pointers.FromString(it.prefix)}
+	errOuter := it.s3svc.ListObjectsV2Pages(input, pageHandler)
+	if errInner != nil {
+		return count, errInner
+	}
+	return count, errOuter
+}
+
