@@ -43,26 +43,17 @@ func (s *swiftService) Get(container string, key string) (int64, io.ReadCloser, 
 	return length, file, nil
 }
 
-func (s *swiftService) Each(container string, prefix string, do func(string) error) (int, error) {
+func (s *swiftService) Each(container string, prefix string, do HandleMetadata) (int, error) {
 	return s.objectsIn(container, prefix).forEach(func(o swift.Object) error {
-		return do(o.Name)
+		return do(o.Name, o.Bytes)
 	})
 }
 
-func (s *swiftService) GetEach(container string, prefix string, do func(int64, io.ReadCloser, error) error) (int, error) {
+func (s *swiftService) GetEach(container string, prefix string, do HandleObject) (int, error) {
 	return s.objectsIn(container, prefix).forEach(func(o swift.Object) error {
 		size, body, err := s.Get(container, o.Name)
-		return do(size, body, err)
+		return do(o.Name, size, body, err)
 	})
-}
-
-func (s *swiftService) ContentLength(container string, key string) (int64, error) {
-	cnx := s.connection()
-	info, _, err := cnx.Object(container, key)
-	if err != nil {
-		return -1, err
-	}
-	return info.Bytes, nil
 }
 
 // ------------------------------------------------------------

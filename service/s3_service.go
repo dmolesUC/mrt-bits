@@ -58,43 +58,31 @@ func (s *s3Service) Get(container string, key string) (int64, io.ReadCloser, err
 	return *output.ContentLength, output.Body, nil
 }
 
-func (s *s3Service) ContentLength(container string, key string) (int64, error) {
-	s3svc, err := s.s3()
-	if err != nil {
-		return -1, err
-	}
-	input := &s3.HeadObjectInput{Bucket: &container, Key: &key}
-	output, err := s3svc.HeadObject(input)
-	if err != nil {
-		return -1, err
-	}
-	return *output.ContentLength, nil
-}
-
-func (s *s3Service) Each(container string, prefix string, do func(string) error) (int, error) {
+func (s *s3Service) Each(container string, prefix string, do HandleMetadata) (int, error) {
 	objects, err := s.objectsIn(container, prefix)
 	if err != nil {
 		return -1, err
 	}
 	return objects.forEach(func(o *s3.Object) error {
 		key := pointers.ToString(o.Key)
-		return do(key)
+		contentLength := pointers.ToInt64(o.Size)
+		return do(key, contentLength)
 	})
 }
 
-func (s *s3Service) GetEach(container string, prefix string, do func(int64, io.ReadCloser, error) error) (int, error) {
+func (s *s3Service) GetEach(container string, prefix string, do HandleObject) (int, error) {
 	objects, err := s.objectsIn(container, prefix)
 	if err != nil {
 		return -1, err
 	}
 	return objects.forEach(func(o *s3.Object) error {
+		key := pointers.ToString(o.Key)
 		size := pointers.ToInt64(o.Size)
 		if size == 0 {
-			return do(size, streams.EmptyReader(), nil)
+			return do(key, size, streams.EmptyReader(), nil)
 		}
-		key := pointers.ToString(o.Key)
 		size, body, err := s.Get(container, key)
-		return do(size, body, err)
+		return do(key, size, body, err)
 	})
 }
 

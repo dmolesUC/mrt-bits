@@ -24,8 +24,9 @@ type list struct {
 }
 
 func (l *list) To(out io.Writer) (int, error) {
-	return l.svc.Each(l.container, l.prefix, func(s string) error {
-		_, err := fmt.Fprintln(out, s)
+	// TODO: optionally print size
+	return l.svc.Each(l.container, l.prefix, func(key string, contentLength int64) error {
+		_, err := fmt.Fprintln(out, key)
 		return err
 	})
 }
