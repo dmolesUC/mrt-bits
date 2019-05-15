@@ -58,7 +58,7 @@ func (s *s3Service) Get(container string, key string) (int64, io.ReadCloser, err
 	return *output.ContentLength, output.Body, nil
 }
 
-func (s *s3Service) Each(container string, prefix string, do HandleMetadata) (int, error) {
+func (s *s3Service) EachMetadata(container string, prefix string, do HandleMetadata) (int, error) {
 	objects, err := s.objectsIn(container, prefix)
 	if err != nil {
 		return -1, err
@@ -70,7 +70,7 @@ func (s *s3Service) Each(container string, prefix string, do HandleMetadata) (in
 	})
 }
 
-func (s *s3Service) GetEach(container string, prefix string, do HandleObject) (int, error) {
+func (s *s3Service) EachObject(container string, prefix string, do HandleObject) (int, error) {
 	objects, err := s.objectsIn(container, prefix)
 	if err != nil {
 		return -1, err

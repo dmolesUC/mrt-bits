@@ -43,5 +43,5 @@ func list(container, prefix string) (int, error) {
 	if err != nil {
 		return 0, nil
 	}
-	return operations.NewList(svc, container, prefix).To(os.Stdout)
+	return operations.NewListObjects(svc, container, prefix).To(os.Stdout)
 }

@@ -43,13 +43,13 @@ func (s *swiftService) Get(container string, key string) (int64, io.ReadCloser, 
 	return length, file, nil
 }
 
-func (s *swiftService) Each(container string, prefix string, do HandleMetadata) (int, error) {
+func (s *swiftService) EachMetadata(container string, prefix string, do HandleMetadata) (int, error) {
 	return s.objectsIn(container, prefix).forEach(func(o swift.Object) error {
 		return do(o.Name, o.Bytes)
 	})
 }
 
-func (s *swiftService) GetEach(container string, prefix string, do HandleObject) (int, error) {
+func (s *swiftService) EachObject(container string, prefix string, do HandleObject) (int, error) {
 	return s.objectsIn(container, prefix).forEach(func(o swift.Object) error {
 		size, body, err := s.Get(container, o.Name)
 		return do(o.Name, size, body, err)

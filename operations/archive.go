@@ -6,11 +6,17 @@ import (
 	"github.com/dmolesUC3/mrt-bits/internal/quietly"
 	"github.com/dmolesUC3/mrt-bits/service"
 	"io"
+	"math"
 	"strings"
 )
 
 type Archive interface {
+	Size() (int64, error)
 	To(out io.Writer) (int, error)
+}
+
+func NewZipArchive(service service.ObjectIterator, container string, prefix string) Archive {
+	return &zipArchive{service: service, container: container, prefix: prefix}
 }
 
 // ------------------------------------------------
@@ -24,14 +30,10 @@ const (
 	dataDescriptor64Len = 24 // descriptor with 8 byte sizes
 	directory64LocLen   = 20 //
 	directory64EndLen   = 56 // + extra
-
-	// Limits for non zip64 files.
-	uint16max = (1 << 16) - 1
-	uint32max = (1 << 32) - 1
 )
 
 type zipArchive struct {
-	service   service.Service
+	service   service.ObjectIterator
 	container string
 	prefix    string
 }
@@ -40,7 +42,7 @@ func (a *zipArchive) Size() (int64, error) {
 	var count int64
 	var size int64
 	var cdSize int64
-	_, err := a.service.Each(a.container, a.prefix, func(key string, contentLength int64) error {
+	_, err := a.service.EachMetadata(a.container, a.prefix, func(key string, contentLength int64) error {
 		entryName := key
 		nameLen := int64(len(entryName))
 
@@ -54,7 +56,7 @@ func (a *zipArchive) Size() (int64, error) {
 			}
 		} else {
 			size += contentLength
-			isZip64 := contentLength >= uint32max
+			isZip64 := contentLength >= math.MaxUint32
 			if isZip64 {
 				size += dataDescriptor64Len
 			} else {
@@ -70,27 +72,28 @@ func (a *zipArchive) Size() (int64, error) {
 
 	cdOffset := size
 
-	if count >= uint16max || cdSize >= uint32max || cdOffset >= uint32max {
+	if count >= math.MaxUint16 || cdSize >= math.MaxUint32 || cdOffset >= math.MaxUint32 {
 		size += directory64EndLen + directory64LocLen
 	} else {
 		size += directoryEndLen
 	}
+
+	size += cdSize
 
 	return size, err
 }
 
 func (a *zipArchive) To(out io.Writer) (int, error) {
 	w := zip.NewWriter(out)
-	defer quietly.Close(w)
-	return a.service.GetEach(a.container, a.prefix, func(key string, contentLength int64, body io.ReadCloser, err error) error {
+	count, err := a.service.EachObject(a.container, a.prefix, func(key string, contentLength int64, body io.ReadCloser, err error) error {
 		defer quietly.Close(body)
 		entryName := key
 		header := &zip.FileHeader{Name: entryName, Method: zip.Store}
-		out, err := w.CreateHeader(header)
+		entryWriter, err := w.CreateHeader(header)
 		if err != nil {
 			return err
 		}
-		bytesWritten, err := io.Copy(out, body)
+		bytesWritten, err := io.Copy(entryWriter, body)
 		if err != nil {
 			return err
 		}
@@ -99,4 +102,12 @@ func (a *zipArchive) To(out io.Writer) (int, error) {
 		}
 		return nil
 	})
+	err2 := w.Close()
+	if err2 == nil {
+		return count, err
+	}
+	if err == nil {
+		return count, err2
+	}
+	return count, fmt.Errorf("error creating archive: %v. In addition, an error occurred closing the zip stream: %v", err.Error(), err2.Error())
 }
