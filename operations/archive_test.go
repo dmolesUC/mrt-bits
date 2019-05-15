@@ -10,8 +10,6 @@ import (
 	. "gopkg.in/check.v1"
 	"io"
 	"io/ioutil"
-	"math"
-	"math/bits"
 	"math/rand"
 )
 
@@ -35,20 +33,6 @@ func (o *objMock) body() io.ReadCloser {
 	}
 	lr := &io.LimitedReader{R: o.rnd, N: o.contentLength}
 	return ioutil.NopCloser(lr)
-}
-
-
-func md5sum(in io.ReadCloser, expectedSize int64) string {
-	defer quietly.Close(in)
-	hash := md5.New()
-	n, err := io.Copy(hash, in)
-	if err != nil {
-		panic(err)
-	}
-	if n != expectedSize {
-		panic(fmt.Errorf("error in hash calculation: expected to hash %d bytes, got %d", expectedSize, n))
-	}
-	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
 type objIterMock struct {
@@ -97,16 +81,32 @@ func newFixedIterator(size int, contentLength int64) *objIterMock {
 	}
 }
 
-func newExponentialIterator(minContentLengthMax uint64) *objIterMock {
-	if minContentLengthMax > math.MaxInt64 {
-		panic(fmt.Errorf("invalid content-length: %d", minContentLengthMax))
+func hash(in io.ReadCloser, expectedSize int64) string {
+	defer quietly.Close(in)
+	hash := md5.New()
+	n, err := io.Copy(hash, in)
+	if err != nil {
+		panic(err)
 	}
-	return &objIterMock{
-		size: bits.Len64(minContentLengthMax),
-		key:  defaultKey,
-		contentLength: func(index int) int64 {
-			return 1 << uint64(index)
-		},
+	if n != expectedSize {
+		panic(fmt.Errorf("error in hash calculation: expected to hash %d bytes, got %d", expectedSize, n))
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+func validateEntries(expected *objIterMock, actual []*zip.File, c *C) {
+	for i, f := range actual {
+		o := expected.objectAt(i)
+		c.Assert(f.Name, Equals, o.key)
+		expectedSize := uint64(o.contentLength)
+		c.Assert(f.CompressedSize64, Equals, expectedSize)
+		c.Assert(f.UncompressedSize64, Equals, expectedSize)
+
+		content, err := f.Open()
+		c.Assert(err, IsNil)
+		hashExpected := hash(o.body(), o.contentLength)
+		hashActual := hash(content, o.contentLength)
+		c.Assert(hashActual, Equals, hashExpected)
 	}
 }
 
@@ -130,26 +130,47 @@ func (s *ArchiveSuite) TestArchiveTo(c *C) {
 	entries := in.File
 	c.Assert(len(entries), Equals, count)
 
-	for i, f := range entries {
-		o := it.objectAt(i)
-		c.Assert(f.Name, Equals, o.key)
-		expectedSize := uint64(o.contentLength)
-		c.Assert(f.CompressedSize64, Equals, expectedSize)
-		c.Assert(f.UncompressedSize64, Equals, expectedSize)
-
-		content, err := f.Open()
-		c.Assert(err, IsNil)
-		md5Expected := md5sum(o.body(), o.contentLength)
-		md5Actual := md5sum(content, o.contentLength)
-		c.Assert(md5Actual, Equals, md5Expected)
-	}
+	validateEntries(it, entries, c)
 }
 
 func (s *ArchiveSuite) TestSize(c *C) {
+	var expectedSize int64 = 11382 // based on previous test
+
 	it := newFixedIterator(10, 1024)
 	archive := NewZipArchive(it, "", "")
 	size, err := archive.Size()
 	c.Assert(err, IsNil)
-	var expectedSize int64 = 11382 // based on previous test
+	c.Assert(size, Equals, expectedSize)
+}
+
+func (s *ArchiveSuite) TestArchiveTo64(c *C) {
+	it := newFixedIterator(32768, 32)
+	archive := NewZipArchive(it, "", "") // TODO: validate container and prefix
+
+	out := new(bytes.Buffer)
+	count, err := archive.To(out)
+	c.Assert(err, IsNil)
+	c.Assert(count, Equals, it.size)
+
+	size := out.Len()
+	println(size)
+
+	zipdata := make([]byte, size)
+	copy(zipdata, out.Bytes())
+
+	in, err := zip.NewReader(bytes.NewReader(zipdata), int64(size))
+	entries := in.File
+	c.Assert(len(entries), Equals, count)
+
+	validateEntries(it, entries, c)
+}
+
+func (s *ArchiveSuite) TestSize64(c *C) {
+	var expectedSize int64 = 4958538 // based on previous test
+
+	it := newFixedIterator(32768, 32)
+	archive := NewZipArchive(it, "", "")
+	size, err := archive.Size()
+	c.Assert(err, IsNil)
 	c.Assert(size, Equals, expectedSize)
 }
