@@ -24,6 +24,15 @@ func (s *swiftService) Type() ServiceType {
 	return Swift
 }
 
+func (s *swiftService) GetSize(container string, key string) (int64, error) {
+	cnx := s.connection()
+	obj, _, err := cnx.Object(container, key)
+	if err != nil {
+		return -1, err
+	}
+	return obj.Bytes, nil
+}
+
 func (s *swiftService) Get(container string, key string) (int64, io.ReadCloser, error) {
 	cnx := s.connection()
 	file, headers, err := cnx.ObjectOpen(container, key, false, nil)

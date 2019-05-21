@@ -44,6 +44,23 @@ func (s *s3Service) Type() ServiceType {
 	return S3
 }
 
+func (s *s3Service) GetSize(container string, key string) (int64, error) {
+	s3svc, err := s.s3()
+	if err != nil {
+		return -1, err
+	}
+	input := &s3.HeadObjectInput{Bucket: &container, Key: &key}
+	output, err := s3svc.HeadObject(input)
+	if err != nil {
+		return -1, err
+	}
+	contentLength := output.ContentLength
+	if contentLength == nil {
+		return -1, fmt.Errorf("S3.HeadObject() returned nil ContentLength")
+	}
+	return *contentLength, nil
+}
+
 func (s *s3Service) Get(container string, key string) (int64, io.ReadCloser, error) {
 	s3svc, err := s.s3()
 	if err != nil {
